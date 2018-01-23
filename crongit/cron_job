@@ -1,0 +1,12 @@
+#/bin/bash
+
+cd /git_root
+
+REMOTEID=`git ls-remote --heads 2>&1 | tail -1 | awk {'print $1'}`
+LOCALID=`git rev-parse origin/master`
+date
+if [ "$REMOTEID" != "$LOCALID" ]; then
+	git pull
+else
+    echo Sync not neccessary
+fi

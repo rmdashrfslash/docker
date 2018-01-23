@@ -1,0 +1,30 @@
+#!/bin/bash
+
+EC2_AVAIL_ZONE=`curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone`
+EC2_REGION="`echo \"$EC2_AVAIL_ZONE\" | sed -e 's:\([0-9][0-9]*\)[a-z]*\$:\\1:'`"
+
+if [ -z "${PRIVATE_KEY_PARAM}" ]; then
+	echo ENV Variable PRIVATE_KEY_PARAM not set
+	exit 1
+fi
+
+
+if [ -z "${CRON_SCHEDULE}" ]; then
+	echo ENV Variable CRON_SCHEDULE not set
+	exit 1
+fi
+
+if [ -n "${KNOWN_HOSTS_PARAM}" ]; then
+	KNOWN_HOSTS_VALUE=`aws ssm get-parameters --names $KNOWN_HOSTS_PARAM --region $EC2_REGION --output text | awk {'print $4'} 2>&1`
+	echo $KNOWN_HOSTS_VALUE | base64 -d | gunzip > /root/.ssh/known_hosts
+fi
+
+aws ssm get-parameters --names $PRIVATE_KEY_PARAM --with-decryption --region $EC2_REGION --output text | awk {'print $4'} | base64 -d | gunzip > /root/.ssh/id_rsa
+
+chmod 600 /root/.ssh/id_rsa
+
+touch /var/log/crontab.log
+
+echo "${CRON_SCHEDULE} /root/cron_job > /var/log/crontab.log" | crontab -
+
+crond -s && tail -f /var/log/crontab.log
